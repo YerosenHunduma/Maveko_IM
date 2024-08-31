@@ -6,19 +6,18 @@ import {
   DataType,
 } from "@shopify/shopify-api";
 import shopifyAccountModel from "../models/shopify.account.model.js";
+import { mapProductToShopifySchema } from "../utils/mapProductToShopifySchema.js";
 
 export const createProduct = async (req, res, next) => {
-  const { shopUrl } = req.body;
+  const { shopUrl, products } = req.body;
 
-  const shopifyAccount = await shopifyAccountModel.findOne({
-    shopUrl,
-  });
+  const shopifyAccount = await shopifyAccountModel.findOne({ shopUrl });
 
   if (!shopifyAccount) {
     return res.status(404).json({ error: "Shopify account not found" });
   }
 
-  const { accessToken, apiKey, apiSecretKey, products } = shopifyAccount;
+  const { accessToken, apiKey, apiSecretKey } = shopifyAccount;
 
   const shopify = shopifyApi({
     apiKey,
@@ -36,24 +35,22 @@ export const createProduct = async (req, res, next) => {
 
   try {
     const client = new shopify.clients.Rest({ session });
-    const body = {
-      product: {
-        title: "Hiking backpack",
-        body_html: "<strong>Good Hiking backpack!</strong>",
-        vendor: "Burton",
-        product_type: "backpack",
-        status: "active",
-      },
-    };
-    await client.post({
-      path: "products",
-      data: body,
-      type: DataType.JSON,
-    });
 
-    res.status(200).json({ message: "Product created successfully" });
+    const newProducts = mapProductToShopifySchema(products);
+
+    for (const product of newProducts) {
+      await client.post({
+        path: "products",
+        data: product,
+        type: DataType.JSON,
+      });
+    }
+
+    res
+      .status(200)
+      .json({ success: true, message: "Products created successfully" });
   } catch (error) {
-    res.status(500).json({ error });
+    res.status(500).json({ error: "Failed to create products" });
   }
 };
 
@@ -68,7 +65,9 @@ export const createShopifyAccount = async (req, res, next) => {
       shopUrl,
     });
     await shopify.save();
-    res.status(200).json({ message: "Shopify account created successfully" });
+    res
+      .status(200)
+      .json({ success: true, message: "Shopify account created successfully" });
   } catch (error) {
     res.status(500).json({ error });
   }
