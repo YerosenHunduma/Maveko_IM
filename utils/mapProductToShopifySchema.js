@@ -9,9 +9,9 @@ export const mapProductToShopifySchema = (products) => {
       images: product.productImg ? [{ src: product.productImg }] : [],
       variants: [
         {
-          price: "1199.00", // This price can be dynamic
+          price: product?.price.toString(),
           sku: product.code,
-          inventory_quantity: product.quantity,
+          inventory_quantity: product?.quantity,
           weight: product.weight,
           weight_unit: "kg",
         },

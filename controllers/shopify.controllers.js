@@ -55,20 +55,51 @@ export const createProduct = async (req, res, next) => {
 };
 
 export const createShopifyAccount = async (req, res, next) => {
-  const { apiKey, apiSecretKey, accessToken, shopUrl, shopName } = req.body;
+  const { apiKey, apiSecretKey, accessToken, shopUrl } = req.body;
+
+  const cleanedUrl = shopUrl.replace(/^https?:\/\//, "");
+  const regex = /^([a-zA-Z0-9-]+)\.myshopify\.com$/;
+
+  const match = cleanedUrl.match(regex);
+  const shopName = match ? match[1] : null;
   try {
-    const shopify = new shopifyAccountModel({
+    const shopify = shopifyApi({
+      apiKey,
+      apiSecretKey,
+      scopes: ["write_products", "read_products"],
+      hostName: "localhost:3000",
+      apiVersion: LATEST_API_VERSION,
+    });
+
+    const session = new Session({
+      shop: shopUrl,
+      accessToken: accessToken,
+      isOnline: false,
+    });
+
+    const client = new shopify.clients.Rest({ session });
+
+    await client.get({ path: "shop", type: DataType.JSON });
+
+    const existingShop = await shopifyAccountModel.findOne({ shopName });
+
+    if (existingShop) {
+      return res.status(400).json({ error: "The shop is already registered" });
+    }
+
+    await new shopifyAccountModel({
       apiKey,
       apiSecretKey,
       accessToken,
       shopName,
       shopUrl,
-    });
-    await shopify.save();
+    }).save();
+
     res
       .status(200)
       .json({ success: true, message: "Shopify account created successfully" });
   } catch (error) {
-    res.status(500).json({ error });
+    console.log(error.message);
+    res.status(500).json({ error: error.message });
   }
 };
