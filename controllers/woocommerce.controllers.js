@@ -1,6 +1,7 @@
 import WooCommerceRestApi from "@woocommerce/woocommerce-rest-api/index.mjs";
 import woocommerceAccountModel from "../models/woocommerce.account.model.js";
 import { mapProductToWoocommerceSchema } from "../utils/mapProductToWooCommerceSchema.js";
+import { errorHandler } from "../utils/errorHandler.js";
 
 export const createProduct = async (req, res, next) => {
   const { name, products } = req.body;
@@ -43,14 +44,6 @@ export const createWoocommerceAccount = async (req, res, next) => {
   try {
     const { url, consumerKey, consumerSecret } = req.body;
 
-    const regex = /https?:\/\/(?:www\.)?([^\.]+)\./;
-    const match = url.match(regex);
-    const shopName = match[1];
-
-    if (!shopName) {
-      return res.status(400).json({ error: "Invalid WooCommerce URL" });
-    }
-
     const api = new WooCommerceRestApi({
       url,
       consumerKey,
@@ -58,27 +51,41 @@ export const createWoocommerceAccount = async (req, res, next) => {
       version: "wc/v3",
     });
 
-    const response = await api.get("products", { per_page: 1 });
+    api
+      .get("products", { per_page: 1 })
+      .then(async (response) => {
+        const regex = /https?:\/\/(?:www\.)?([^\.]+)\./;
+        const match = url.match(regex);
+        const shopName = match[1];
+        // console.log(response.data);
+        const woocommerceAccount = await woocommerceAccountModel.findOne({
+          shopName,
+        });
 
-    if (response.status === 200) {
-      await new woocommerceAccountModel({
-        shopName,
-        consumerKey,
-        consumerSecret,
-        url,
-      }).save();
+        if (woocommerceAccount) {
+          return next(
+            new errorHandler("The woocommerce account already registered", 400)
+          );
+        }
 
-      return res
-        .status(201)
-        .json({ message: "WooCommerce account created successfully" });
-    } else {
-      return res.status(response.status).json({
-        error:
-          "Failed to validate WooCommerce credentials. Please check and try again.",
+        await new woocommerceAccountModel({
+          shopName,
+          consumerKey,
+          consumerSecret,
+          url,
+        }).save();
+
+        res.status(201).json({
+          success: true,
+          message: "WooCommerce account created successfully",
+        });
+      })
+      .catch((error) => {
+        return next(
+          new errorHandler("Incorrect WooCommerce credentials.", 401)
+        );
       });
-    }
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: error.message });
+    next(error);
   }
 };

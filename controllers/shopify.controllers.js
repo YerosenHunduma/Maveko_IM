@@ -7,17 +7,23 @@ import {
 } from "@shopify/shopify-api";
 import shopifyAccountModel from "../models/shopify.account.model.js";
 import { mapProductToShopifySchema } from "../utils/mapProductToShopifySchema.js";
+import { errorHandler } from "../utils/errorHandler.js";
 
 export const createProduct = async (req, res, next) => {
-  const { shopUrl, products } = req.body;
+  const { shopName, products } = req.body;
 
-  const shopifyAccount = await shopifyAccountModel.findOne({ shopUrl });
+  const shopifyAccount = await shopifyAccountModel.findOne({ shopName });
 
   if (!shopifyAccount) {
-    return res.status(404).json({ error: "Shopify account not found" });
+    return next(
+      new errorHandler(
+        "Can't find Shopify account associated with this ShopName",
+        404
+      )
+    );
   }
 
-  const { accessToken, apiKey, apiSecretKey } = shopifyAccount;
+  const { accessToken, apiKey, apiSecretKey, shopUrl } = shopifyAccount;
 
   const shopify = shopifyApi({
     apiKey,
@@ -50,7 +56,7 @@ export const createProduct = async (req, res, next) => {
       .status(200)
       .json({ success: true, message: "Products created successfully" });
   } catch (error) {
-    res.status(500).json({ error: "Failed to create products" });
+    next(error);
   }
 };
 
@@ -84,7 +90,9 @@ export const createShopifyAccount = async (req, res, next) => {
     const existingShop = await shopifyAccountModel.findOne({ shopName });
 
     if (existingShop) {
-      return res.status(400).json({ error: "The shop is already registered" });
+      return next(
+        new errorHandler("The shopify account already registered", 400)
+      );
     }
 
     await new shopifyAccountModel({
@@ -99,7 +107,6 @@ export const createShopifyAccount = async (req, res, next) => {
       .status(200)
       .json({ success: true, message: "Shopify account created successfully" });
   } catch (error) {
-    console.log(error.message);
-    res.status(500).json({ error: error.message });
+    next(error);
   }
 };
