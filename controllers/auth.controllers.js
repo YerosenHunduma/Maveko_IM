@@ -5,6 +5,12 @@ export const Login = async (req, res, next) => {
   try {
     const user = await adminAccountModel.findOne({ email });
 
+    if (!user) {
+      return res
+        .status(401)
+        .json({ success: false, message: "Invalid credentials" });
+    }
+
     const token = jwt.sign({ user: email }, process.env.jwt_secret_key);
 
     const { password: pass, ...userInfo } = user._doc;
