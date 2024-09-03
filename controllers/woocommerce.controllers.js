@@ -4,14 +4,13 @@ import { mapProductToWoocommerceSchema } from "../utils/mapProductToWooCommerceS
 import { errorHandler } from "../utils/errorHandler.js";
 
 export const createProduct = async (req, res, next) => {
-  const { name, products } = req.body;
-
+  const { shopName, products } = req.body;
   const woocommerceAccount = await woocommerceAccountModel.findOne({
-    shopName: name,
+    shopName,
   });
 
   if (!woocommerceAccount) {
-    return res.status(404).json({ error: "Woocommerce account not found" });
+    return next(new errorHandler("Woocommerce account not found", 400));
   }
 
   const { consumerKey, consumerSecret, url } = woocommerceAccount;
@@ -28,11 +27,19 @@ export const createProduct = async (req, res, next) => {
     api
       .post("products/batch", data)
       .then((response) => {
-        console.log("DDD", response.data);
-        res.json(response.data);
+        res.status(201).json({
+          success: true,
+          message: "WooCommerce Product is created successfully",
+        });
       })
       .catch((error) => {
-        res.status(500).json({ error: error.response.data });
+        console.log(error.response.data);
+        return next(
+          new errorHandler(
+            error.response.data.message,
+            error.response.data.status
+          )
+        );
       });
   } catch (error) {
     console.error(error);
@@ -57,7 +64,6 @@ export const createWoocommerceAccount = async (req, res, next) => {
         const regex = /https?:\/\/(?:www\.)?([^\.]+)\./;
         const match = url.match(regex);
         const shopName = match[1];
-        // console.log(response.data);
         const woocommerceAccount = await woocommerceAccountModel.findOne({
           shopName,
         });

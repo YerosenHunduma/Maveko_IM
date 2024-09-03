@@ -3,6 +3,7 @@ import cors from "cors";
 import rootRouter from "./routes/index.js";
 import { connectDb } from "./config/dbConfig.js";
 import dotenv from "dotenv";
+// import { seed } from "./seeder/admin.seed.js";
 
 dotenv.config();
 
@@ -31,3 +32,5 @@ connectDb()
   .catch((error) => {
     console.error("Database connection error:", error.message);
   });
+
+// seed();
